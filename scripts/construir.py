@@ -167,32 +167,36 @@ solo_packs = '''<script>
     }
   }
   (function(){
+    /* respaldo por si el detector no trae la moneda directamente */
     var MONEDAS = { CO:"COP", MX:"MXN", PE:"PEN", CL:"CLP", AR:"ARS", BR:"BRL",
-                    GT:"GTQ", HN:"HNL", NI:"NIO", CR:"CRC", DO:"DOP", PY:"PYG", UY:"UYU", BO:"BOB" };
-    function conRate(cur, rate){
-      if(!rate) return;
-      var dec = rate > 100 ? 0 : 2;
-      var nf;
-      try{ nf = new Intl.NumberFormat("es", {style:"currency", currency:cur, currencyDisplay:"code", maximumFractionDigits:dec, minimumFractionDigits:dec}); }
-      catch(e){ return; }
-      window.CU_FX = { cur: cur, rate: rate, fmt: function(usd){ return nf.format(usd * rate); } };
-      repintarPrecios();
-    }
-    function conPais(cc){
-      var cur = MONEDAS[(cc || "").toUpperCase()];
-      if(!cur) return;
+                    GT:"GTQ", HN:"HNL", NI:"NIO", CR:"CRC", DO:"DOP", PY:"PYG", UY:"UYU", BO:"BOB",
+                    ES:"EUR", US:"USD", EC:"USD", PA:"USD", SV:"USD", VE:"USD", CA:"CAD", GB:"GBP" };
+    function conMoneda(cur){
+      cur = (cur || "").toUpperCase();
+      if(!cur || cur === "USD") return;   /* USD ya es la base */
       fetch("https://open.er-api.com/v6/latest/USD").then(function(r){ return r.json(); })
-        .then(function(fx){ conRate(cur, fx && fx.rates && fx.rates[cur]); }).catch(function(){});
+        .then(function(fx){
+          var rate = fx && fx.rates && fx.rates[cur];
+          if(!rate) return;
+          var dec = rate > 100 ? 0 : 2;
+          var nf;
+          try{ nf = new Intl.NumberFormat("es", {style:"currency", currency:cur, currencyDisplay:"code", maximumFractionDigits:dec, minimumFractionDigits:dec}); }
+          catch(e){ return; }
+          window.CU_FX = { cur: cur, rate: rate, fmt: function(usd){ return nf.format(usd * rate); } };
+          repintarPrecios();
+        }).catch(function(){});
     }
     fetch("https://ipapi.co/json/").then(function(r){ return r.json(); })
       .then(function(g){
-        var cc = g && (g.country_code || g.country);
-        if(cc) conPais(cc);
+        /* ipapi entrega la moneda del pais directamente (cualquier pais del mundo) */
+        var cur = g && g.currency;
+        if(cur) conMoneda(cur);
+        else if(g && (g.country_code || g.country)) conMoneda(MONEDAS[(g.country_code || g.country).toUpperCase()]);
         else throw 0;
       })
       .catch(function(){
         fetch("https://api.country.is/").then(function(r){ return r.json(); })
-          .then(function(h){ if(h && h.country) conPais(h.country); }).catch(function(){});
+          .then(function(h){ if(h && h.country) conMoneda(MONEDAS[h.country.toUpperCase()]); }).catch(function(){});
       });
   })();
 
